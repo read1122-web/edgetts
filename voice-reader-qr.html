@@ -4,63 +4,359 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>語音報讀系統連結 QR Code 產生器</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 QRCode 函式庫 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Noto Sans TC"', 'sans-serif'],
+                    },
+                    colors: {
+                        sheets: {
+                            green: '#0f9d58',
+                            header: '#f3f3f3',
+                            border: '#e0e0e0',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
     <style>
-        .gradient-bg {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        body {
+            background: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
+            /* 備用背景：若漸層不支援 */
+            background-attachment: fixed;
         }
+
         .glass-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
         }
-        #qrcode img {
-            margin: 0 auto;
+
+        .input-group:focus-within label {
+            color: #4f46e5;
         }
-        /* 模擬試算表樣式 */
+
+        .input-group:focus-within svg {
+            color: #4f46e5;
+        }
+
+        /* 模擬 Google Sheets 樣式 */
+        .sheet-container {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
         .sheet-table th {
-            background-color: #f8f9fa;
-            color: #5f6368;
-            font-weight: normal;
+            background-color: #f3f3f3;
+            color: #444;
+            font-weight: 600;
             text-align: center;
             border: 1px solid #e0e0e0;
+            padding: 8px;
+            font-size: 0.85rem;
         }
         .sheet-table td {
             border: 1px solid #e0e0e0;
-            padding: 4px 12px;
-        }
-        .sheet-col-header {
-            width: 30px;
+            padding: 8px 12px;
+            font-size: 0.9rem;
+            background: white;
         }
         .sheet-row-header {
-            background-color: #f8f9fa;
-            color: #5f6368;
-            width: 30px;
+            background-color: #f3f3f3 !important;
+            color: #666;
+            width: 40px;
             text-align: center;
+            font-weight: 600;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen font-sans">
+<body class="min-h-screen py-10 px-4 text-gray-700">
 
-    <div class="container mx-auto px-4 py-8 max-w-2xl">
-        <header class="text-center mb-8">
-            <h1 class="text-3xl font-extrabold text-gray-800 mb-2">語音報讀系統連結 QR Code 產生器</h1>
-            <p class="text-gray-500 text-sm sm:text-base">輸入 Google Drive 連結，自動生成報讀系統網址與 QR Code</p>
-            <p class="text-indigo-600 font-medium text-sm sm:text-base mt-1">輸入 Google 試算表連結，可根據替換語詞內容糾正語音報讀發音</p>
+    <div class="container mx-auto max-w-3xl">
+        
+        <!-- Header -->
+        <header class="text-center mb-10">
+            <div class="inline-block p-3 rounded-full bg-white shadow-md mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                </svg>
+            </div>
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800 tracking-tight mb-3">語音報讀系統連結產生器</h1>
+            <div class="flex flex-col gap-1 items-center justify-center text-gray-600">
+                <p class="text-base">輸入 Google Drive 連結，快速生成 QR Code</p>
+                <p class="text-sm text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full font-medium inline-block">
+                    ✨ 支援 Google 試算表發音糾正功能
+                </p>
+            </div>
         </header>
 
-        <!-- 使用說明區塊 -->
-        <div class="bg-white border-l-4 border-blue-500 p-6 rounded-r-2xl mb-8 shadow-sm text-sm">
-            <h2 class="flex items-center text-blue-800 font-bold mb-4 text-base">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                使用前必讀說明
-            </h2>
-            <div class="space-y-6">
-                <div class="text-gray-700">
+        <!-- Main Content Grid -->
+        <div class="grid gap-8">
+            
+            <!-- Instructions Card -->
+            <div class="glass-card rounded-2xl p-6 md:p-8">
+                <div class="flex items-center gap-2 mb-4 text-emerald-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <h2 class="text-lg font-bold">使用前必讀</h2>
+                </div>
+
+                <div class="space-y-6">
+                    <!-- Rule 1 -->
+                    <div class="flex gap-3">
+                        <span class="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-sm">1</span>
+                        <div>
+                            <p class="font-bold text-gray-800">共用權限設定</p>
+                            <p class="text-sm text-gray-600 mt-1">試算表與 <span class="text-indigo-600 font-medium">報讀用的 PDF 檔</span> 皆必須設定為「<strong>知道連結的任何人皆可查看</strong>」。</p>
+                            <p class="text-xs text-gray-500 mt-2 bg-gray-50 p-2 rounded border border-gray-100">
+                                💡 建議將 PDF 檔與試算表存放在同一個 Google Drive 資料夾中，便於管理。多個 PDF 可共用同一份試算表。
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Rule 2 -->
+                    <div class="flex gap-3">
+                        <span class="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-sm">2</span>
+                        <div class="w-full">
+                            <p class="font-bold text-gray-800 mb-2">試算表格式規範 (破音字校正)</p>
+                            
+                            <!-- Visual Spreadsheet -->
+                            <div class="sheet-container mb-2">
+                                <div class="bg-sheets-green text-white px-3 py-1 text-xs font-bold flex items-center gap-1">
+                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/><path d="M7 12h2v5H7zm4-7h2v12h-2zm4 4h2v8h-2z"/></svg>
+                                    校正發音表
+                                </div>
+                                <table class="sheet-table w-full border-collapse">
+                                    <thead>
+                                        <tr>
+                                            <th></th>
+                                            <th>A</th>
+                                            <th>B</th>
+                                            <th>C</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="sheet-row-header">1</td>
+                                            <td class="text-gray-400 text-center text-xs">序號 (標題)</td>
+                                            <td class="text-gray-400 text-center text-xs">原始語詞 (標題)</td>
+                                            <td class="text-gray-400 text-center text-xs">替換語詞 (標題)</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="sheet-row-header">2</td>
+                                            <td class="text-center text-gray-500">1</td>
+                                            <td class="font-bold text-red-500 text-center">朝會</td>
+                                            <td class="font-bold text-emerald-600 text-center">招會</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="sheet-row-header">3</td>
+                                            <td class="text-center text-gray-500">2</td>
+                                            <td class="font-bold text-red-500 text-center">重修</td>
+                                            <td class="font-bold text-emerald-600 text-center">蟲修</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p class="text-xs text-gray-500">※ 若 AI 唸錯破音字，請於 C 欄填寫諧音修正。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Form Card -->
+            <div class="glass-card rounded-2xl p-6 md:p-8 shadow-xl">
+                <div class="space-y-6">
+                    
+                    <!-- Sheet Input -->
+                    <div class="input-group">
+                        <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2 transition-colors">
+                            <span class="bg-emerald-100 text-emerald-600 p-1 rounded">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            </span>
+                            Google 試算表連結 (選填)
+                        </label>
+                        <div class="relative">
+                            <input type="text" id="sheetUrl" 
+                                placeholder="https://docs.google.com/spreadsheets/d/..." 
+                                class="w-full pl-4 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition shadow-sm text-sm">
+                        </div>
+                    </div>
+
+                    <!-- PDF Input -->
+                    <div class="input-group">
+                        <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2 transition-colors">
+                            <span class="bg-red-100 text-red-600 p-1 rounded">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                            </span>
+                            報讀用 PDF 檔案連結 (必填)
+                        </label>
+                        <div class="relative">
+                            <input type="text" id="pdfUrl" 
+                                placeholder="https://drive.google.com/file/d/..." 
+                                class="w-full pl-4 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition shadow-sm text-sm">
+                        </div>
+                    </div>
+
+                    <button onclick="generateAll()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-4 rounded-xl transition transform active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 text-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                        </svg>
+                        生成網址與 QR Code
+                    </button>
+                </div>
+            </div>
+
+            <!-- Result Card -->
+            <div id="resultCard" class="hidden glass-card rounded-2xl p-8 shadow-2xl border-t-4 border-indigo-500 fade-in">
+                <div class="flex flex-col items-center">
+                    <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <span class="text-green-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </span>
+                        生成成功
+                    </h2>
+                    
+                    <!-- QR Code Container -->
+                    <div class="bg-white p-4 rounded-xl shadow-lg mb-6 border border-gray-100">
+                        <div id="qrcode"></div>
+                    </div>
+
+                    <!-- URL & Copy -->
+                    <div class="w-full bg-gray-50 p-4 rounded-xl border border-gray-200 mb-6">
+                        <label class="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-wide">報讀系統專用網址</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="finalUrl" readonly 
+                                class="flex-1 bg-white border border-gray-300 px-3 py-2 rounded-lg text-sm text-indigo-600 font-mono focus:outline-none">
+                            <button onclick="copyLink()" id="copyBtn" class="bg-gray-800 hover:bg-black text-white px-4 py-2 rounded-lg text-sm font-bold transition flex items-center whitespace-nowrap">
+                                複製連結
+                            </button>
+                        </div>
+                    </div>
+
+                    <a id="openLink" href="#" target="_blank" class="inline-flex items-center justify-center gap-2 text-white bg-indigo-600 hover:bg-indigo-700 px-8 py-3 rounded-full font-bold shadow-md transition transform hover:-translate-y-0.5">
+                        直接開啟網頁 
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Error Message -->
+            <div id="errorMsg" class="hidden p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r-lg shadow-sm text-center font-medium fade-in"></div>
+
+        </div>
+    </div>
+
+    <script>
+        function extractId(url) {
+            if (!url || url.trim() === "") return null;
+            const match = url.match(/[-\w]{25,}/);
+            return match ? match[0] : null;
+        }
+
+        function generateAll() {
+            const sheetUrl = document.getElementById('sheetUrl').value.trim();
+            const pdfUrl = document.getElementById('pdfUrl').value.trim();
+            const errorMsg = document.getElementById('errorMsg');
+            const resultCard = document.getElementById('resultCard');
+            const finalUrlInput = document.getElementById('finalUrl');
+            const openLink = document.getElementById('openLink');
+
+            errorMsg.classList.add('hidden');
+            resultCard.classList.add('hidden'); // Reset result visibility
+            
+            const sheetId = extractId(sheetUrl);
+            const pdfId = extractId(pdfUrl);
+
+            if (!pdfId) {
+                showError("請確認輸入的報讀用 PDF 檔案連結包含正確的 Google Drive ID。");
+                return;
+            }
+
+            let baseUrl = "https://read1122-web.github.io/edgetts/";
+            let targetUrl = "";
+            
+            if (sheetId) {
+                targetUrl = `${baseUrl}?googlesheetid=${sheetId}&file=${pdfId}`;
+            } else {
+                targetUrl = `${baseUrl}?file=${pdfId}`;
+            }
+            
+            // Show Result
+            finalUrlInput.value = targetUrl;
+            openLink.href = targetUrl;
+            
+            // Generate QR
+            const qrcodeDiv = document.getElementById('qrcode');
+            qrcodeDiv.innerHTML = ""; 
+            new QRCode(qrcodeDiv, {
+                text: targetUrl,
+                width: 180,
+                height: 180,
+                colorDark : "#1f2937",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+            
+            resultCard.classList.remove('hidden');
+            
+            // Smooth scroll to result
+            setTimeout(() => {
+                resultCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+        }
+
+        function showError(msg) {
+            const errorMsg = document.getElementById('errorMsg');
+            errorMsg.textContent = msg;
+            errorMsg.classList.remove('hidden');
+            errorMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function copyLink() {
+            const copyText = document.getElementById("finalUrl");
+            copyText.select();
+            document.execCommand("copy");
+            
+            const btn = document.getElementById('copyBtn');
+            const originalText = btn.innerHTML;
+            
+            btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg> 已複製`;
+            btn.classList.replace('bg-gray-800', 'bg-green-600');
+            
+            setTimeout(() => {
+                btn.innerHTML = "複製連結";
+                btn.classList.replace('bg-green-600', 'bg-gray-800');
+            }, 2000);
+        }
+    </script>
+</body>
+</html>                <div class="text-gray-700">
                     <p class="mb-2"><strong>1. 共用權限：</strong> 試算表與 PDF 檔皆必須設定為「<strong>知道連結的任何人皆可查看</strong>」。</p>
                     <p class="text-blue-600 font-medium"><strong>※ 多個 PDF 檔可共用同一個 Google 試算表來修正發音。</strong></p>
                 </div>
@@ -239,3 +535,4 @@
     </script>
 </body>
 </html>
+
