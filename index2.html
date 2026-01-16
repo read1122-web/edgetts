@@ -457,7 +457,8 @@ function renderPage(pageNum) {
         pdfViewer.style.position = 'relative';
 
         const pdfCanvas = document.createElement('canvas');
-        const context = pdfCanvas.getContext('2d');
+        // 設置 willReadFrequently 以優化頻繁讀取操作（消除警告並提升性能）
+        const context = pdfCanvas.getContext('2d', { willReadFrequently: true });
 
         const dpi = window.devicePixelRatio || 1;
         pdfCanvas.height = scaledViewport.height * dpi;
