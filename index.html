@@ -1065,14 +1065,29 @@ if (clearCacheButton) {
 
 function replaceTextWithSheetData(text, data) {
     if (!data) return text;
-    // slice(1) 表示從第2行開始讀取（跳過第1行標題）
-    data.table.rows.slice(1).forEach(row => {
+    
+    // 調試：顯示所有行的內容
+    console.log("試算表總行數:", data.table.rows.length);
+    data.table.rows.forEach((row, index) => {
+        const original = row.c[0]?.v?.toString() || '';
+        const replacement = row.c[1]?.v?.toString() || '';
+        console.log(`第${index + 1}行: B欄="${original}", C欄="${replacement}"`);
+    });
+    
+    // 從索引1開始讀取（對應試算表的第2行，跳過第1行標題）
+    // 即使第2行是空的，也要從這裡開始處理
+    data.table.rows.slice(1).forEach((row, index) => {
         // 確保資料存在且轉換為字串
         const original = row.c[0]?.v?.toString() || ''; // B欄
         const replacement = row.c[1]?.v?.toString() || ''; // C欄
+        
+        // 只有當兩欄都有值時才進行替換
         if (original && replacement) {
+            console.log(`應用替換規則 第${index + 2}行: "${original}" -> "${replacement}"`);
             // 使用字串替換，確保都是純文字處理
             text = text.replace(new RegExp(original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "g"), replacement);
+        } else {
+            console.log(`跳過第${index + 2}行（B欄或C欄為空）`);
         }
     });
     return text;
