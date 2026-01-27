@@ -1046,7 +1046,10 @@ if (clearCacheButton) {
 
         function fetchSheetData(sheetId) {
     const base = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?`;
-    const query = encodeURIComponent('Select B, C format B "", C ""'); // 使用 format 強制轉換為純文字
+    // 使用 Select * 查詢所有行，然後在處理時手動選擇 B 和 C 欄
+    // 或者明確指定包含標題行：Select B, C format B "", C ""
+    // 注意：Google Visualization API 可能會自動跳過標題行，如果第一行被識別為標題
+    const query = encodeURIComponent('Select B, C format B "", C ""');
     const url = `${base}&tq=${query}`;
 
     return fetch(url)
@@ -1054,7 +1057,18 @@ if (clearCacheButton) {
         .then(rep => {
             const jsonStr = rep.match(/google\.visualization\.Query\.setResponse\(([\s\S]+)\);/)[1];
             const data = JSON.parse(jsonStr);
+            
+            // 調試：檢查返回的數據結構
+            console.log("API 返回的數據結構:", data);
+            console.log("總行數:", data.table?.rows?.length);
+            console.log("第一行數據:", data.table?.rows?.[0]);
             console.log("確認欄位對應:", data.table.rows[0]?.c); // 應為 [B欄, C欄]
+            
+            // 檢查是否有標題行信息
+            if (data.table?.cols) {
+                console.log("欄位標題:", data.table.cols.map(col => col.label || col.id));
+            }
+            
             return data;
         })
         .catch(err => {
@@ -1067,27 +1081,38 @@ function replaceTextWithSheetData(text, data) {
     if (!data) return text;
     
     // 調試：顯示所有行的內容
-    console.log("試算表總行數:", data.table.rows.length);
+    console.log("API 返回的試算表總行數:", data.table.rows.length);
+    console.log("注意：Google Visualization API 可能已經自動跳過了標題行");
     data.table.rows.forEach((row, index) => {
         const original = row.c[0]?.v?.toString() || '';
         const replacement = row.c[1]?.v?.toString() || '';
-        console.log(`第${index + 1}行: B欄="${original}", C欄="${replacement}"`);
+        // 如果 API 已跳過標題行，rows[0] 對應試算表的第2行
+        const actualRowNumber = index + 2; // 假設標題行已被跳過
+        console.log(`API返回的索引${index} (試算表第${actualRowNumber}行): B欄="${original}", C欄="${replacement}"`);
     });
     
-    // 從索引1開始讀取（對應試算表的第2行，跳過第1行標題）
-    // 即使第2行是空的，也要從這裡開始處理
-    data.table.rows.slice(1).forEach((row, index) => {
+    // 根據控制台輸出分析：
+    // - 試算表有3行：第1行標題、第2行數據、第3行數據
+    // - API 返回2行：rows[0] 對應試算表第2行，rows[1] 對應試算表第3行
+    // - 這表示 Google Visualization API 已經自動跳過了標題行
+    // - 因此應該從 rows[0] 開始讀取，不跳過任何行
+    
+    // 直接從索引0開始讀取（因為標題行已被 API 跳過）
+    data.table.rows.forEach((row, index) => {
         // 確保資料存在且轉換為字串
         const original = row.c[0]?.v?.toString() || ''; // B欄
         const replacement = row.c[1]?.v?.toString() || ''; // C欄
         
         // 只有當兩欄都有值時才進行替換
         if (original && replacement) {
-            console.log(`應用替換規則 第${index + 2}行: "${original}" -> "${replacement}"`);
+            // 如果 API 已跳過標題行，rows[0] 對應試算表的第2行
+            const actualRowNumber = index + 2;
+            console.log(`應用替換規則 試算表第${actualRowNumber}行: "${original}" -> "${replacement}"`);
             // 使用字串替換，確保都是純文字處理
             text = text.replace(new RegExp(original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "g"), replacement);
         } else {
-            console.log(`跳過第${index + 2}行（B欄或C欄為空）`);
+            const actualRowNumber = index + 2;
+            console.log(`跳過試算表第${actualRowNumber}行（B欄或C欄為空）`);
         }
     });
     return text;
