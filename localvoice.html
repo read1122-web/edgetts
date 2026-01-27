@@ -1078,17 +1078,53 @@ function fetchSheetData(sheetId, callback) {
                 .then(res => res.text())
                 .then(rep => {
                     const data = JSON.parse(rep.substr(47).slice(0, -2));
+                    
+                    // 調試：顯示返回的數據結構
+                    console.log("API 返回的試算表總行數:", data.table?.rows?.length);
+                    console.log("注意：Google Visualization API 可能已經自動跳過了標題行");
+                    if (data.table?.rows) {
+                        data.table.rows.forEach((row, index) => {
+                            const original = row.c[1]?.v?.toString() || '';
+                            const replacement = row.c[2]?.v?.toString() || '';
+                            // 如果 API 已跳過標題行，rows[0] 對應試算表的第2行
+                            const actualRowNumber = index + 2;
+                            console.log(`API返回的索引${index} (試算表第${actualRowNumber}行): B欄="${original}", C欄="${replacement}"`);
+                        });
+                    }
+                    
                     callback(data.table.rows);
                 })
                 .catch(err => console.error('Error fetching data:', err));
         }
 
         function replaceTextUsingSheetData(text, sheetData) {
-            sheetData.slice(1).forEach(row => {
-                const originalWord = row.c[1].v;
-                const replacementWord = row.c[2].v;
-                const regex = new RegExp(originalWord, 'g');
-                text = text.replace(regex, replacementWord);
+            if (!sheetData) return text;
+            
+            // 根據控制台輸出分析：
+            // - 試算表有3行：第1行標題、第2行數據、第3行數據
+            // - API 返回2行：rows[0] 對應試算表第2行，rows[1] 對應試算表第3行
+            // - 這表示 Google Visualization API 已經自動跳過了標題行
+            // - 因此應該從 rows[0] 開始讀取，不跳過任何行
+            
+            // 直接從索引0開始讀取（因為標題行已被 API 跳過）
+            sheetData.forEach((row, index) => {
+                // 確保資料存在且轉換為字串
+                const originalWord = row.c[1]?.v?.toString() || ''; // B欄
+                const replacementWord = row.c[2]?.v?.toString() || ''; // C欄
+                
+                // 只有當兩欄都有值時才進行替換
+                if (originalWord && replacementWord) {
+                    // 如果 API 已跳過標題行，rows[0] 對應試算表的第2行
+                    const actualRowNumber = index + 2;
+                    console.log(`應用替換規則 試算表第${actualRowNumber}行: "${originalWord}" -> "${replacementWord}"`);
+                    // 使用字串替換，轉義正則表達式特殊字符
+                    const escapedOriginal = originalWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = new RegExp(escapedOriginal, 'g');
+                    text = text.replace(regex, replacementWord);
+                } else {
+                    const actualRowNumber = index + 2;
+                    console.log(`跳過試算表第${actualRowNumber}行（B欄或C欄為空）`);
+                }
             });
             return text;
         }
