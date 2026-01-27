@@ -3,14 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>語音報讀系統連結 QR Code 產生器</title>
+    <title>語音報讀系統連結 QR Code 產生器 (進階版)</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
     
+    <!-- Libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- 用於打包 ZIP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- 用於下載檔案 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     
     <script>
         tailwind.config = {
@@ -34,12 +39,11 @@
     <style>
         body {
             background: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
-            /* 備用背景：若漸層不支援 */
             background-attachment: fixed;
         }
 
         .glass-card {
-            background: rgba(255, 255, 255, 0.85);
+            background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.5);
@@ -91,11 +95,35 @@
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
+        /* Checkbox Custom Style */
+        .custom-checkbox {
+            width: 1.25rem;
+            height: 1.25rem;
+            border-radius: 0.25rem;
+            border: 2px solid #cbd5e1;
+            appearance: none;
+            cursor: pointer;
+            position: relative;
+        }
+        .custom-checkbox:checked {
+            background-color: #4f46e5;
+            border-color: #4f46e5;
+        }
+        .custom-checkbox:checked::after {
+            content: '✓';
+            color: white;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 0.8rem;
+        }
     </style>
 </head>
 <body class="min-h-screen py-10 px-4 text-gray-700">
 
-    <div class="container mx-auto max-w-3xl">
+    <div class="container mx-auto max-w-4xl">
         
         <!-- Header -->
         <header class="text-center mb-10">
@@ -104,93 +132,89 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                 </svg>
             </div>
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-800 tracking-tight mb-3">語音報讀系統連結產生器</h1>
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800 tracking-tight mb-3">語音報讀系統 QR Code 產生器</h1>
             <div class="flex flex-col gap-1 items-center justify-center text-gray-600">
-                <p class="text-base">輸入 Google Drive 連結，快速生成 QR Code</p>
-                <p class="text-sm text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full font-medium inline-block">
-                    ✨ 支援 Google 試算表發音糾正功能
-                </p>
+                <p class="text-base">輸入 Google Drive 連結，快速生成 QR Code 並管理歷史紀錄</p>
             </div>
         </header>
 
         <!-- Main Content Grid -->
         <div class="grid gap-8">
             
-            <!-- Instructions Card -->
+            <!-- Instructions Card (Collapsible for better UX on mobile) -->
             <div class="glass-card rounded-2xl p-6 md:p-8">
-                <div class="flex items-center gap-2 mb-4 text-emerald-700">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <h2 class="text-lg font-bold">使用前必讀</h2>
-                </div>
-
-                <div class="space-y-6">
-                    <!-- Rule 1 -->
-                    <div class="flex gap-3">
-                        <span class="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-sm">1</span>
-                        <div>
-                            <p class="font-bold text-gray-800">共用權限設定</p>
-                            <p class="text-sm text-gray-600 mt-1">試算表與 <span class="text-indigo-600 font-medium">報讀用的 PDF 檔</span> 皆必須設定為「<strong>知道連結的任何人皆可查看</strong>」。</p>
-                            <p class="text-xs text-gray-500 mt-2 bg-gray-50 p-2 rounded border border-gray-100">
-                                💡 建議將 PDF 檔與試算表存放在同一個 Google Drive 資料夾中，便於管理。多個 PDF 可共用同一份試算表。
-                            </p>
-                        </div>
-                    </div>
-
-                    <!-- Rule 2 -->
-                    <div class="flex gap-3">
-                        <span class="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-sm">2</span>
-                        <div class="w-full">
-                            <p class="font-bold text-gray-800 mb-2">試算表格式規範 (破音字校正)</p>
-                            
-                            <!-- Visual Spreadsheet -->
-                            <div class="sheet-container mb-2">
-                                <div class="bg-sheets-green text-white px-3 py-1 text-xs font-bold flex items-center gap-1">
-                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/><path d="M7 12h2v5H7zm4-7h2v12h-2zm4 4h2v8h-2z"/></svg>
-                                    校正發音表
-                                </div>
-                                <table class="sheet-table w-full border-collapse">
-                                    <thead>
-                                        <tr>
-                                            <th></th>
-                                            <th>A</th>
-                                            <th>B</th>
-                                            <th>C</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td class="sheet-row-header">1</td>
-                                            <td class="text-gray-400 text-center text-xs">序號 (標題)</td>
-                                            <td class="text-gray-400 text-center text-xs">原始語詞 (標題)</td>
-                                            <td class="text-gray-400 text-center text-xs">替換語詞 (標題)</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="sheet-row-header">2</td>
-                                            <td class="text-center text-gray-500">1</td>
-                                            <td class="font-bold text-red-500 text-center">朝會</td>
-                                            <td class="font-bold text-emerald-600 text-center">招會</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="sheet-row-header">3</td>
-                                            <td class="text-center text-gray-500">2</td>
-                                            <td class="font-bold text-red-500 text-center">重修</td>
-                                            <td class="font-bold text-emerald-600 text-center">蟲修</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                <details class="group">
+                    <summary class="flex items-center gap-2 text-emerald-700 cursor-pointer list-none font-bold text-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                        使用前必讀說明
+                    </summary>
+                    <div class="mt-4 space-y-6 animate-fadeIn">
+                         <!-- Rule 1 -->
+                        <div class="flex gap-3">
+                            <span class="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-sm">1</span>
+                            <div>
+                                <p class="font-bold text-gray-800">共用權限設定</p>
+                                <p class="text-sm text-gray-600 mt-1">試算表與 <span class="text-indigo-600 font-medium">報讀用的 PDF 檔</span> 皆必須設定為「<strong>知道連結的任何人皆可查看</strong>」。</p>
                             </div>
-                            <p class="text-xs text-gray-500">※ 若 AI 唸錯破音字，請於 C 欄填寫諧音修正。</p>
+                        </div>
+                        <!-- Rule 2 -->
+                        <div class="flex gap-3">
+                            <span class="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-sm">2</span>
+                            <div class="w-full">
+                                <p class="font-bold text-gray-800 mb-2">試算表格式規範 (破音字校正)</p>
+                                <div class="sheet-container mb-2">
+                                    <div class="bg-sheets-green text-white px-3 py-1 text-xs font-bold flex items-center gap-1">
+                                        校正發音表
+                                    </div>
+                                    <table class="sheet-table w-full border-collapse">
+                                        <thead>
+                                            <tr>
+                                                <th></th><th>A</th><th>B</th><th>C</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td class="sheet-row-header">1</td>
+                                                <td class="text-gray-400 text-center text-xs">序號 (標題)</td>
+                                                <td class="text-gray-400 text-center text-xs">原始語詞 (標題)</td>
+                                                <td class="text-gray-400 text-center text-xs">替換語詞 (標題)</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="sheet-row-header">2</td>
+                                                <td class="text-center text-gray-500">1</td>
+                                                <td class="font-bold text-red-500 text-center">朝會</td>
+                                                <td class="font-bold text-emerald-600 text-center">招會</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
+                </details>
             </div>
 
             <!-- Input Form Card -->
             <div class="glass-card rounded-2xl p-6 md:p-8 shadow-xl">
                 <div class="space-y-6">
                     
+                    <!-- Description Input (New) -->
+                    <div class="input-group">
+                        <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2 transition-colors">
+                            <span class="bg-blue-100 text-blue-600 p-1 rounded">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            </span>
+                            檔案用途說明 (必填，例如：國語第一課)
+                        </label>
+                        <div class="relative">
+                            <input type="text" id="descInput" 
+                                placeholder="請輸入檔案描述，方便日後辨識" 
+                                class="w-full pl-4 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition shadow-sm text-sm">
+                        </div>
+                    </div>
+
                     <!-- Sheet Input -->
                     <div class="input-group">
                         <label class="block text-sm font-bold text-gray-700 mb-2 flex items-center gap-2 transition-colors">
@@ -221,24 +245,27 @@
                         </div>
                     </div>
 
-                    <button onclick="generateAll()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-4 rounded-xl transition transform active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 text-lg">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                        </svg>
-                        生成網址與 QR Code
-                    </button>
+                    <div class="flex flex-col md:flex-row gap-4">
+                        <button onclick="generateAndSave()" class="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-4 rounded-xl transition transform active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 text-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                            </svg>
+                            生成並儲存
+                        </button>
+                    </div>
                 </div>
             </div>
 
             <!-- Result Card -->
             <div id="resultCard" class="hidden glass-card rounded-2xl p-8 shadow-2xl border-t-4 border-indigo-500 fade-in">
                 <div class="flex flex-col items-center">
-                    <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                    <h2 class="text-xl font-bold text-gray-800 mb-2 flex items-center gap-2">
                         <span class="text-green-500">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         </span>
                         生成成功
                     </h2>
+                    <p class="text-gray-500 mb-6 text-sm">資料已儲存至下方列表</p>
                     
                     <!-- QR Code Container -->
                     <div class="bg-white p-4 rounded-xl shadow-lg mb-6 border border-gray-100">
@@ -252,13 +279,13 @@
                             <input type="text" id="finalUrl" readonly 
                                 class="flex-1 bg-white border border-gray-300 px-3 py-2 rounded-lg text-sm text-indigo-600 font-mono focus:outline-none">
                             <button onclick="copyLink()" id="copyBtn" class="bg-gray-800 hover:bg-black text-white px-4 py-2 rounded-lg text-sm font-bold transition flex items-center whitespace-nowrap">
-                                複製連結
+                                複製
                             </button>
                         </div>
                     </div>
 
                     <a id="openLink" href="#" target="_blank" class="inline-flex items-center justify-center gap-2 text-white bg-indigo-600 hover:bg-indigo-700 px-8 py-3 rounded-full font-bold shadow-md transition transform hover:-translate-y-0.5">
-                        直接開啟網頁 
+                        直接開啟 
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                         </svg>
@@ -266,30 +293,166 @@
                 </div>
             </div>
 
-            <!-- Error Message -->
-            <div id="errorMsg" class="hidden p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r-lg shadow-sm text-center font-medium fade-in"></div>
+            <!-- History Section (New) -->
+            <div class="glass-card rounded-2xl p-6 md:p-8 overflow-hidden">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <div class="flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <h2 class="text-xl font-bold text-gray-800">歷史紀錄庫 (本地)</h2>
+                    </div>
+                    <div class="flex gap-2 text-sm">
+                        <button onclick="exportSelected()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium transition shadow-sm flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed" id="btnExport">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                            匯出勾選 (ZIP)
+                        </button>
+                        <button onclick="deleteSelected()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium transition shadow-sm flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed" id="btnDelete">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            刪除勾選
+                        </button>
+                    </div>
+                </div>
 
+                <!-- Warning Message -->
+                <div class="bg-amber-50 border-l-4 border-amber-400 p-4 mb-6 rounded-r-lg">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-amber-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-amber-800">
+                                <strong>注意：</strong>歷史紀錄僅儲存於此瀏覽器中。若<strong>清除瀏覽器紀錄</strong> (Cache/Cookie)，資料將會遺失。請定期使用「匯出」功能備份重要資料。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="text-gray-500 text-sm border-b border-gray-200">
+                                <th class="p-3 w-10">
+                                    <input type="checkbox" id="selectAll" class="custom-checkbox" onchange="toggleSelectAll()">
+                                </th>
+                                <th class="p-3">說明</th>
+                                <th class="p-3">建立日期</th>
+                                <th class="p-3 text-right">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody" class="text-sm">
+                            <!-- JS Generated Content -->
+                        </tbody>
+                    </table>
+                    <div id="emptyState" class="text-center py-10 text-gray-400 hidden">
+                        <p>尚無歷史紀錄</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error Message -->
+            <div id="errorMsg" class="hidden fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-full shadow-lg text-sm font-bold z-50 transition-opacity duration-300"></div>
+
+            <!-- Hidden container for temp QR generation during export -->
+            <div id="tempQrContainer" style="display:none;"></div>
         </div>
     </div>
 
     <script>
+        // --- 1. IndexedDB Setup ---
+        const DB_NAME = 'SpeechReaderDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'records';
+        let db;
+
+        // Init DB
+        const initDB = () => {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onupgradeneeded = (event) => {
+                    db = event.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+                    }
+                };
+                request.onsuccess = (event) => {
+                    db = event.target.result;
+                    loadHistory();
+                    resolve(db);
+                };
+                request.onerror = (event) => {
+                    console.error("DB Error", event.target.error);
+                    reject(event.target.error);
+                };
+            });
+        };
+
+        // Add Record
+        const addRecord = (data) => {
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.add(data);
+            request.onsuccess = () => {
+                loadHistory();
+            };
+        };
+
+        // Delete Records
+        const deleteRecords = (ids) => {
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            ids.forEach(id => store.delete(id));
+            transaction.oncomplete = () => {
+                loadHistory();
+                document.getElementById('selectAll').checked = false;
+            };
+        };
+
+        // Load History
+        const loadHistory = () => {
+            const transaction = db.transaction([STORE_NAME], 'readonly');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.getAll();
+
+            request.onsuccess = () => {
+                const records = request.result.reverse(); // Newest first
+                renderTable(records);
+            };
+        };
+
+        // --- 2. Main Logic ---
+
+        window.onload = () => {
+            initDB();
+        };
+
         function extractId(url) {
             if (!url || url.trim() === "") return null;
             const match = url.match(/[-\w]{25,}/);
             return match ? match[0] : null;
         }
 
-        function generateAll() {
+        async function generateAndSave() {
+            const descInput = document.getElementById('descInput');
             const sheetUrl = document.getElementById('sheetUrl').value.trim();
             const pdfUrl = document.getElementById('pdfUrl').value.trim();
-            const errorMsg = document.getElementById('errorMsg');
             const resultCard = document.getElementById('resultCard');
             const finalUrlInput = document.getElementById('finalUrl');
             const openLink = document.getElementById('openLink');
 
-            errorMsg.classList.add('hidden');
-            resultCard.classList.add('hidden'); // Reset result visibility
+            // Reset UI
+            hideError();
+            resultCard.classList.add('hidden');
             
+            // Validation
+            if (!descInput.value.trim()) {
+                showError("請輸入檔案用途說明 (例如：國語第一課)");
+                descInput.focus();
+                return;
+            }
+
             const sheetId = extractId(sheetUrl);
             const pdfId = extractId(pdfUrl);
 
@@ -298,20 +461,19 @@
                 return;
             }
 
+            // Generate URL
             let baseUrl = "https://read1122-web.github.io/edgetts/";
             let targetUrl = "";
-            
             if (sheetId) {
                 targetUrl = `${baseUrl}?googlesheetid=${sheetId}&file=${pdfId}`;
             } else {
                 targetUrl = `${baseUrl}?file=${pdfId}`;
             }
             
-            // Show Result
+            // Render Result Card
             finalUrlInput.value = targetUrl;
             openLink.href = targetUrl;
             
-            // Generate QR
             const qrcodeDiv = document.getElementById('qrcode');
             qrcodeDiv.innerHTML = ""; 
             new QRCode(qrcodeDiv, {
@@ -325,17 +487,229 @@
             
             resultCard.classList.remove('hidden');
             
-            // Smooth scroll to result
+            // Save to DB
+            const record = {
+                description: descInput.value.trim(),
+                sheetUrl: sheetUrl,
+                pdfUrl: pdfUrl,
+                targetUrl: targetUrl,
+                date: new Date().toISOString()
+            };
+            addRecord(record);
+
+            // Smooth scroll
             setTimeout(() => {
                 resultCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }, 100);
+        }
+
+        // --- 3. UI Helpers ---
+
+        function renderTable(records) {
+            const tbody = document.getElementById('historyTableBody');
+            const emptyState = document.getElementById('emptyState');
+            tbody.innerHTML = '';
+
+            if (records.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                records.forEach(rec => {
+                    const date = new Date(rec.date).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit' });
+                    const tr = document.createElement('tr');
+                    tr.className = "border-b border-gray-100 hover:bg-indigo-50 transition-colors";
+                    
+                    // Added link to description
+                    tr.innerHTML = `
+                        <td class="p-3"><input type="checkbox" class="record-checkbox custom-checkbox" value="${rec.id}" onchange="updateBtnState()"></td>
+                        <td class="p-3 font-medium text-gray-800">
+                            <a href="${rec.targetUrl}" target="_blank" class="text-indigo-600 hover:text-indigo-800 hover:underline transition-colors">${escapeHtml(rec.description)}</a>
+                        </td>
+                        <td class="p-3 text-gray-500 text-xs">${date}</td>
+                        <td class="p-3 text-right flex justify-end gap-2">
+                            <button onclick='viewRecord("${rec.targetUrl}")' class="text-indigo-600 hover:bg-indigo-100 p-2 rounded" title="查看 QR Code">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                            </button>
+                            <button onclick='downloadSingleQR("${escapeHtml(rec.description)}", "${rec.targetUrl}")' class="text-emerald-600 hover:bg-emerald-100 p-2 rounded" title="下載 QR Code 圖片">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+            updateBtnState();
+        }
+
+        function viewRecord(url) {
+            document.getElementById('finalUrl').value = url;
+            document.getElementById('openLink').href = url;
+            const qrcodeDiv = document.getElementById('qrcode');
+            qrcodeDiv.innerHTML = "";
+            new QRCode(qrcodeDiv, {
+                text: url,
+                width: 180,
+                height: 180,
+                colorDark : "#1f2937",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+            document.getElementById('resultCard').classList.remove('hidden');
+            document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        // --- 4. Export & Delete Logic ---
+
+        function toggleSelectAll() {
+            const mainCheck = document.getElementById('selectAll');
+            const checks = document.querySelectorAll('.record-checkbox');
+            checks.forEach(c => c.checked = mainCheck.checked);
+            updateBtnState();
+        }
+
+        function updateBtnState() {
+            const checks = document.querySelectorAll('.record-checkbox:checked');
+            const count = checks.length;
+            const btnExport = document.getElementById('btnExport');
+            const btnDelete = document.getElementById('btnDelete');
+            
+            if (count > 0) {
+                btnExport.disabled = false;
+                btnDelete.disabled = false;
+                btnExport.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> 匯出 (${count})`;
+            } else {
+                btnExport.disabled = true;
+                btnDelete.disabled = true;
+                btnExport.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> 匯出勾選`;
+            }
+        }
+
+        function deleteSelected() {
+            const checks = document.querySelectorAll('.record-checkbox:checked');
+            if (checks.length === 0) return;
+            
+            if(confirm(`確定要刪除這 ${checks.length} 筆資料嗎？`)) {
+                const ids = Array.from(checks).map(c => Number(c.value));
+                deleteRecords(ids);
+            }
+        }
+
+        function generateQRBase64(text) {
+            return new Promise((resolve) => {
+                const container = document.createElement('div');
+                // Temporary render off-screen
+                new QRCode(container, {
+                    text: text,
+                    width: 500, // High res for print
+                    height: 500,
+                    correctLevel : QRCode.CorrectLevel.H
+                });
+                
+                // QRCode.js takes a moment to render the canvas/img
+                setTimeout(() => {
+                    const canvas = container.querySelector('canvas');
+                    const img = container.querySelector('img');
+                    
+                    if (canvas) {
+                        resolve(canvas.toDataURL('image/png').split(',')[1]);
+                    } else if (img) {
+                        resolve(img.src.split(',')[1]);
+                    } else {
+                        resolve(null);
+                    }
+                }, 100);
+            });
+        }
+        
+        // Single Download (Immediate)
+        function downloadSingleQR(name, url) {
+             const container = document.createElement('div');
+             new QRCode(container, {
+                 text: url,
+                 width: 500,
+                 height: 500,
+                 correctLevel: QRCode.CorrectLevel.H
+             });
+             
+             setTimeout(() => {
+                 const img = container.querySelector('img') || container.querySelector('canvas');
+                 if(img) {
+                    const src = img.src || img.toDataURL();
+                    saveAs(src, `${name}_QR.png`);
+                 }
+             }, 100);
+        }
+
+        async function exportSelected() {
+            const checks = document.querySelectorAll('.record-checkbox:checked');
+            if (checks.length === 0) return;
+
+            const btn = document.getElementById('btnExport');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `處理中...`;
+            btn.disabled = true;
+
+            const zip = new JSZip();
+            const ids = Array.from(checks).map(c => Number(c.value));
+            
+            // Get data from DB
+            const transaction = db.transaction([STORE_NAME], 'readonly');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.getAll();
+            
+            request.onsuccess = async () => {
+                const allRecords = request.result;
+                const selectedRecords = allRecords.filter(r => ids.includes(r.id));
+                
+                // 1. Create CSV content (Modified to Chinese Headers)
+                let csvContent = "\uFEFF檔案說明,報讀網址,試算表連結,PDF連結,建立日期\n";
+                
+                // 2. Generate Images and add to ZIP
+                const imgFolder = zip.folder("images");
+                
+                for (let rec of selectedRecords) {
+                    // Add to CSV
+                    const safeDesc = rec.description.replace(/,/g, "，"); // simple escape
+                    csvContent += `${safeDesc},${rec.targetUrl},${rec.sheetUrl},${rec.pdfUrl},${rec.date}\n`;
+                    
+                    // Generate QR
+                    try {
+                        const base64 = await generateQRBase64(rec.targetUrl);
+                        if (base64) {
+                            // Sanitize filename
+                            let filename = rec.description.replace(/[\\/:*?"<>|]/g, "_") + ".png";
+                            imgFolder.file(filename, base64, {base64: true});
+                        }
+                    } catch (e) {
+                        console.error("QR Gen Error", e);
+                    }
+                }
+                
+                zip.file("data_list.csv", csvContent);
+                
+                // 3. Download Zip
+                zip.generateAsync({type:"blob"}).then(function(content) {
+                    saveAs(content, "語音報讀_QR_Export.zip");
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                });
+            };
+        }
+
+        function hideError() {
+            const errorMsg = document.getElementById('errorMsg');
+            if (errorMsg) {
+                errorMsg.classList.add('hidden');
+            }
         }
 
         function showError(msg) {
             const errorMsg = document.getElementById('errorMsg');
             errorMsg.textContent = msg;
             errorMsg.classList.remove('hidden');
-            errorMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => {
+                errorMsg.classList.add('hidden');
+            }, 3000);
         }
 
         function copyLink() {
@@ -346,13 +720,23 @@
             const btn = document.getElementById('copyBtn');
             const originalText = btn.innerHTML;
             
-            btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg> 已複製`;
+            btn.innerHTML = `OK!`;
             btn.classList.replace('bg-gray-800', 'bg-green-600');
             
             setTimeout(() => {
-                btn.innerHTML = "複製連結";
+                btn.innerHTML = "複製";
                 btn.classList.replace('bg-green-600', 'bg-gray-800');
             }, 2000);
+        }
+
+        function escapeHtml(text) {
+            if (!text) return text;
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
         }
     </script>
 </body>
