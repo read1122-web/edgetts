@@ -1065,6 +1065,7 @@ if (clearCacheButton) {
 
 function replaceTextWithSheetData(text, data) {
     if (!data) return text;
+    // slice(1) 表示從第2行開始讀取（跳過第1行標題）
     data.table.rows.slice(1).forEach(row => {
         // 確保資料存在且轉換為字串
         const original = row.c[0]?.v?.toString() || ''; // B欄
