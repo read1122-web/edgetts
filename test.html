@@ -116,6 +116,11 @@
                             return;
                         }
                         
+                        // 修正 1：必須手動將 Token 設定給 gapi.client，否則 API 呼叫不會帶 Token
+                        if (gapi.client) {
+                            gapi.client.setToken(response);
+                        }
+
                         setIsAuthorized(true);
                         setIsLoading(false);
                         addLog("登入成功！", "success");
@@ -123,7 +128,6 @@
                 });
                 setTokenClient(client);
                 // 使用 prompt: 'select_account' 來達到強制選擇帳號的效果
-                // 這等同於 Firebase 的 GoogleAuthProvider.PROMPT.SELECT_ACCOUNT
                 client.requestAccessToken({ prompt: 'select_account' });
             };
 
@@ -135,9 +139,18 @@
                     const response = await gapi.client.sheets.spreadsheets.create({
                         properties: { title: `我的新試算表 (${new Date().toLocaleDateString()})` },
                     });
-                    setSheetId(response.result.spreadsheetId);
+                    
+                    const newSheetId = response.result.spreadsheetId;
+                    setSheetId(newSheetId);
+
+                    // 修正 2：自動抓取第一個工作表的名稱 (例如 '工作表1' 或 'Sheet1')
+                    // 避免因為語言不同導致寫入 'Sheet1' 失敗
+                    const firstSheetTitle = response.result.sheets?.[0]?.properties?.title || 'Sheet1';
+                    setRange(`${firstSheetTitle}!A1`);
+
                     addLog(`已建立新試算表`, "success");
                     addLog(`連結: ${response.result.spreadsheetUrl}`, "link");
+                    addLog(`已自動設定範圍為: ${firstSheetTitle}!A1`, "info");
                 } catch (err) {
                     addLog(`建立失敗: ${err.message}`, "error");
                 } finally {
@@ -156,7 +169,12 @@
                     });
                     addLog(`寫入成功: ${cellValue}`, "success");
                 } catch (err) {
-                    addLog(`寫入失敗: ${err.result?.error?.message || err.message}`, "error");
+                    // 增加錯誤提示：如果是 400 錯誤，通常是工作表名稱不對
+                    let errMsg = err.result?.error?.message || err.message;
+                    if (err.status === 400 && errMsg.includes("Unable to parse range")) {
+                        errMsg += " (請檢查工作表名稱是否正確，例如 '工作表1')";
+                    }
+                    addLog(`寫入失敗: ${errMsg}`, "error");
                 } finally {
                     setIsLoading(false);
                 }
@@ -195,7 +213,7 @@
                     {/* 頂部導航 */}
                     <nav className="bg-white shadow-sm border-b px-6 py-4 flex justify-between items-center">
                         <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                            <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-2h2v2zm0-4H7v-2h2v2zm0-4H7V7h2v2zm4 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2zm4 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2z"/></svg>
+                            <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-2h2v2zm0-4H7v-2h2v2zm0-4H7V7h2v2zm4 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2zm4 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2z"/></svg>
                             試算表小工具
                         </h1>
                         {!isAuthorized ? (
