@@ -293,7 +293,7 @@
                 </div>
             </div>
 
-            <!-- History Section (New) -->
+            <!-- History Section -->
             <div class="glass-card rounded-2xl p-6 md:p-8 overflow-hidden">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <div class="flex items-center gap-2">
@@ -302,11 +302,22 @@
                         </svg>
                         <h2 class="text-xl font-bold text-gray-800">歷史紀錄庫 (本地)</h2>
                     </div>
-                    <div class="flex gap-2 text-sm">
+                    <div class="flex gap-2 text-sm flex-wrap">
+                        <!-- Import Button -->
+                        <button onclick="triggerImport()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition shadow-sm flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                            </svg>
+                            匯入 (CSV)
+                        </button>
+                        <input type="file" id="importFile" accept=".csv" class="hidden" onchange="handleImport(this)">
+
+                        <!-- Export Button -->
                         <button onclick="exportSelected()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium transition shadow-sm flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed" id="btnExport">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                             匯出勾選 (ZIP)
                         </button>
+                        <!-- Delete Button -->
                         <button onclick="deleteSelected()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium transition shadow-sm flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed" id="btnDelete">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                             刪除勾選
@@ -396,6 +407,38 @@
             const request = store.add(data);
             request.onsuccess = () => {
                 loadHistory();
+            };
+        };
+
+        // Batch Import Records
+        const importData = (records) => {
+            if (!records || records.length === 0) return;
+            
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            let count = 0;
+            
+            records.forEach(rec => {
+                store.add(rec);
+                count++;
+            });
+            
+            transaction.oncomplete = () => {
+                loadHistory();
+                showError(`成功匯入 ${count} 筆資料！`);
+                // Change error style to success temporarily
+                const msg = document.getElementById('errorMsg');
+                msg.classList.remove('bg-red-600');
+                msg.classList.add('bg-green-600');
+                setTimeout(() => {
+                    msg.classList.remove('bg-green-600');
+                    msg.classList.add('bg-red-600');
+                }, 3000);
+            };
+            
+            transaction.onerror = (e) => {
+                console.error("Import Error", e);
+                showError("匯入失敗，請確認檔案格式是否正確。");
             };
         };
 
@@ -558,7 +601,7 @@
             document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
-        // --- 4. Export & Delete Logic ---
+        // --- 4. Export & Import & Delete Logic ---
 
         function toggleSelectAll() {
             const mainCheck = document.getElementById('selectAll');
@@ -592,6 +635,64 @@
                 const ids = Array.from(checks).map(c => Number(c.value));
                 deleteRecords(ids);
             }
+        }
+
+        // Import Functions
+        function triggerImport() {
+            document.getElementById('importFile').click();
+        }
+
+        function handleImport(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                try {
+                    const records = parseCSV(text);
+                    if (records.length > 0) {
+                        importData(records);
+                    } else {
+                        showError("匯入失敗：檔案內容為空或格式不符");
+                    }
+                } catch (err) {
+                    console.error(err);
+                    showError("匯入失敗：解析 CSV 時發生錯誤");
+                }
+                // Clear input
+                input.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function parseCSV(text) {
+            // Very basic CSV parser adapted for this tool's export format
+            // Assumes headers are on the first line
+            const lines = text.split('\n');
+            const records = [];
+            
+            // Skip header (i=1)
+            for(let i=1; i<lines.length; i++) {
+                const line = lines[i].trim();
+                if(!line) continue;
+                
+                // Use regex or split carefully. Our export uses simple comma join.
+                // Assuming description has no commas or they were replaced by full-width commas.
+                const cols = line.split(',');
+                
+                // Schema: Description, TargetURL, SheetURL, PDFURL, Date
+                if(cols.length >= 4) {
+                    records.push({
+                        description: cols[0] || "未命名",
+                        targetUrl: cols[1] || "",
+                        sheetUrl: cols[2] === "undefined" ? "" : cols[2],
+                        pdfUrl: cols[3] || "",
+                        date: cols[4] || new Date().toISOString()
+                    });
+                }
+            }
+            return records;
         }
 
         function generateQRBase64(text) {
