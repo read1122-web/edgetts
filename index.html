@@ -1519,6 +1519,29 @@ if (clearCacheButton) {
   let audioPlayer = null;
   let browserVoices = [];
 
+  // 偵測是否為 iOS（含 iPadOS），用於 speechSynthesis 相容性處理
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  /**
+   * iOS 18 / Safari：語音必須在「使用者手勢」內解鎖後才能發音。
+   * 須在按鈕點擊等事件的「同步」程式碼開頭呼叫，不可放在 setTimeout/async 之後。
+   */
+  function unlockLocalSpeechForIOS() {
+      if (!('speechSynthesis' in window)) return;
+      try {
+          window.speechSynthesis.cancel();
+          if (typeof window.speechSynthesis.resume === 'function') {
+              window.speechSynthesis.resume();
+          }
+          var u = new SpeechSynthesisUtterance('');
+          u.volume = 0;
+          window.speechSynthesis.speak(u);
+      } catch (e) {
+          console.warn('unlockLocalSpeechForIOS:', e);
+      }
+  }
+
   // 初始化瀏覽器語音列表
   function initBrowserVoices() {
       if (!('speechSynthesis' in window)) {
@@ -1559,12 +1582,25 @@ if (clearCacheButton) {
       const isChinese = lowerLang === 'zh' || lowerLang.startsWith('zh');
       
       if (isChinese) {
-          // 優先：繁體中文（zh-TW）女聲
+          // 最優先：美佳（Mei-Jia）— 正統中文發音
+          for (const langCode of chineseLangCodes) {
+              const meiJia = browserVoices.find(v => {
+                  const vLang = (v.lang || '').toLowerCase();
+                  const isLangMatch = vLang === langCode || vLang.startsWith(langCode);
+                  const isMeiJia = v.name && /美佳|Mei-?Jia|MeiJia/i.test(v.name);
+                  return isLangMatch && isMeiJia;
+              });
+              if (meiJia) {
+                  console.log('找到中文語音（美佳）:', meiJia.name, meiJia.lang);
+                  return meiJia;
+              }
+          }
+          // 次優先：其他繁體中文女聲（Yuna、Ting-Ting 等）
           for (const langCode of chineseLangCodes) {
               const zhFemale = browserVoices.find(v => {
                   const vLang = (v.lang || '').toLowerCase();
                   const isLangMatch = vLang === langCode || vLang.startsWith(langCode);
-                  const isFemale = v.name && /female|女|woman|girl|Mei-Jia|Yuna|Ting-Ting|Sin-Ji/i.test(v.name);
+                  const isFemale = v.name && /female|女|woman|girl|Yuna|Ting-Ting|Sin-Ji/i.test(v.name);
                   return isLangMatch && isFemale;
               });
               if (zhFemale) {
@@ -1573,7 +1609,7 @@ if (clearCacheButton) {
               }
           }
           
-          // 次優先：任何中文語音（優先 zh-TW）
+          // 再次：任何中文語音（優先 zh-TW）
           for (const langCode of chineseLangCodes) {
               const zhVoice = browserVoices.find(v => {
                   const vLang = (v.lang || '').toLowerCase();
@@ -1624,16 +1660,23 @@ if (clearCacheButton) {
           if (!voice) {
               console.warn('找不到對應的本機語音，無法朗讀');
               // 如果是中文且找不到語音，再試一次（iPad 可能需要時間載入）
-              if (langPrefix === 'zh') {
+              if (langPrefix === 'zh' || langPrefix === 'en') {
+                  var delay = (typeof isIOS !== 'undefined' && isIOS) ? 500 : 200;
                   setTimeout(() => {
                       const retryVoice = findLocalVoice(langPrefix);
                       if (retryVoice) {
                           doSpeak(retryVoice);
+                      } else if (typeof isIOS !== 'undefined' && isIOS) {
+                          setTimeout(() => {
+                              const retry2 = findLocalVoice(langPrefix);
+                              if (retry2) doSpeak(retry2);
+                              else { console.error('重試後仍找不到本機語音'); if (callback) callback(); }
+                          }, 800);
                       } else {
-                          console.error('重試後仍找不到中文語音');
+                          console.error('重試後仍找不到本機語音');
                           if (callback) callback();
                       }
-                  }, 200);
+                  }, delay);
                   return;
               }
               if (callback) callback();
@@ -1678,6 +1721,9 @@ if (clearCacheButton) {
           };
 
           try {
+              if (typeof window.speechSynthesis.resume === 'function') {
+                  window.speechSynthesis.resume();
+              }
               window.speechSynthesis.speak(utterance);
           } catch (e) {
               console.error('speak() 呼叫失敗：', e);
@@ -1957,6 +2003,7 @@ window.sendTextToTTS = sendTextToTTS;
         let isReading = false;
 
         selectAllTextButton.addEventListener('click', function() {
+            if (!isReading) unlockLocalSpeechForIOS();
             clearHighlights();
             if (isReading) {
                 // 取消朗讀
@@ -2400,6 +2447,7 @@ async function geminiImageDescribe(base64Image) {
 }
 
 async function readTextInsideFrame() {
+    unlockLocalSpeechForIOS();
     // 如果正在進行圖片辨識，直接返回，防止重複執行
     if (isImageRecognizing) {
         console.log('圖片辨識正在進行中，忽略重複請求');
@@ -2748,6 +2796,7 @@ document.addEventListener('mouseup', () => {
     }
 }
         function sendHighlightedText() {
+            unlockLocalSpeechForIOS();
             // 清除標記替換緩存
             clearMarkReplacementCache();
 
@@ -5401,6 +5450,7 @@ function finishMark(e) {
                 // 如果沒有移動，觸發語音朗讀（在清理完成後）
                 // 但不在標記模式下觸發，避免錯誤
                 if (shouldRead && !isMarkingMode) {
+                    unlockLocalSpeechForIOS();
                     // 設置標記，避免 click 事件重複觸發
                     markBlock.dataset.justHandledDrag = 'true';
                     // 使用 setTimeout 確保所有清理工作完成後再觸發語音
@@ -5440,6 +5490,7 @@ function finishMark(e) {
 
 // 朗讀標記區塊
 async function readMarkBlock(markId, pageNum) {
+    unlockLocalSpeechForIOS();
     // 每次朗讀新的區塊前，先清除之前的朗讀標示與發音狀態
     try {
         const allFraSpans = document.querySelectorAll('#viewerContainer .textLayer my-fra');
@@ -5928,6 +5979,7 @@ async function editMarkReplacementText(markId, pageNum) {
                     originalTextDisplay.addEventListener('click', (e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        unlockLocalSpeechForIOS();
                         // 使用首頁選擇的發音方式發音
                         if (displayText && displayText !== '(無文字)') {
                             sendTextToTTS(displayText);
