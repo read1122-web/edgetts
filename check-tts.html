@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TTS 端點偵測</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --ok: #1f8f45;
+      --fail: #c0392b;
+      --muted: #666;
+    }
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      margin: 24px;
+      line-height: 1.45;
+    }
+    h1 { margin: 0 0 8px; }
+    p { margin: 0 0 10px; }
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin: 14px 0 18px;
+      flex-wrap: wrap;
+    }
+    button {
+      padding: 8px 12px;
+      border: 1px solid #888;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    input[type="number"] {
+      width: 90px;
+      padding: 6px;
+      border-radius: 6px;
+      border: 1px solid #888;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid #999;
+      padding: 8px;
+      vertical-align: top;
+    }
+    th {
+      text-align: left;
+      background: rgba(127, 127, 127, 0.15);
+    }
+    .ok { color: var(--ok); font-weight: 700; }
+    .fail { color: var(--fail); font-weight: 700; }
+    .muted { color: var(--muted); }
+    .summary { margin-top: 14px; font-weight: 700; }
+    .hint { font-size: 13px; color: var(--muted); }
+    code { font-family: Consolas, monospace; }
+  </style>
+</head>
+<body>
+  <h1>TTS 端點偵測（靜態 HTML 版）</h1>
+  <p>同時檢查每個端點的 <code>/health</code> 和 <code>/tts</code>，只有兩者都成功才算可用。</p>
+  <p class="hint">
+    注意：若回傳 <code>forbidden</code>，通常是來源（Origin）未被允許，需在服務端調整 allowed origins。
+  </p>
+
+  <div class="toolbar">
+    <button id="runBtn">開始檢查</button>
+    <label>逾時（秒）
+      <input id="timeoutSec" type="number" min="1" max="30" step="1" value="8" />
+    </label>
+    <span id="runningState" class="muted">待命中</span>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>端點</th>
+        <th>health</th>
+        <th>tts</th>
+        <th>總結果</th>
+      </tr>
+    </thead>
+    <tbody id="resultBody"></tbody>
+  </table>
+
+  <div id="summary" class="summary"></div>
+
+  <script>
+    const BASE_URLS = [
+      "https://readtts-tts.hf.space",
+      "https://readatts-tts.hf.space",
+      "https://readbtts-tts.hf.space",
+      "https://readctts-tts.hf.space",
+      "https://readdtts-tts.hf.space",
+      "https://readetts-tts.hf.space",
+    ];
+
+    const resultBody = document.getElementById("resultBody");
+    const summary = document.getElementById("summary");
+    const runBtn = document.getElementById("runBtn");
+    const timeoutSecInput = document.getElementById("timeoutSec");
+    const runningState = document.getElementById("runningState");
+
+    function esc(text) {
+      return String(text)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+    }
+
+    function withTimeout(ms) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), ms);
+      return { signal: ctrl.signal, clear: () => clearTimeout(timer) };
+    }
+
+    async function fetchJson(url, options = {}, timeoutMs = 8000) {
+      const t = withTimeout(timeoutMs);
+      const start = performance.now();
+      try {
+        const res = await fetch(url, { ...options, signal: t.signal });
+        const elapsed = Math.round(performance.now() - start);
+        const raw = await res.text();
+        let data = null;
+        try { data = raw ? JSON.parse(raw) : null; } catch (_) { data = null; }
+        return { ok: res.ok, status: res.status, elapsed, raw, data };
+      } catch (e) {
+        const elapsed = Math.round(performance.now() - start);
+        return { ok: false, status: null, elapsed, error: e };
+      } finally {
+        t.clear();
+      }
+    }
+
+    async function checkOne(baseUrl, timeoutMs) {
+      const health = await fetchJson(`${baseUrl}/health`, {
+        method: "GET",
+        headers: { "Accept": "application/json,text/plain,*/*" }
+      }, timeoutMs);
+
+      const ttsPayload = {
+        text: "TTS health probe",
+        voice: "zh-TW-HsiaoChenNeural",
+        rate: "+0%",
+        volume: "+0%",
+        pitch: "+0Hz"
+      };
+
+      const tts = await fetchJson(`${baseUrl}/tts`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json,text/plain,*/*"
+        },
+        body: JSON.stringify(ttsPayload)
+      }, timeoutMs);
+
+      const ttsData = tts.data && typeof tts.data === "object" ? tts.data : null;
+      const ttsBusinessOk = Boolean(ttsData && ttsData.success === true && typeof ttsData.audio_url === "string" && ttsData.audio_url.trim());
+      const overallOk = Boolean(health.ok && tts.ok && ttsBusinessOk);
+
+      return { baseUrl, health, tts, ttsBusinessOk, overallOk };
+    }
+
+    function healthText(health) {
+      if (health.error) return `FAIL / - / ${health.elapsed}ms / ${health.error.name || "Error"}`;
+      const msg = health.data && health.data.message ? health.data.message : (health.raw || "").slice(0, 80);
+      return `${health.ok ? "PASS" : "FAIL"} / ${health.status} / ${health.elapsed}ms / ${msg || "OK"}`;
+    }
+
+    function ttsText(tts, ttsBusinessOk) {
+      if (tts.error) return `FAIL / - / ${tts.elapsed}ms / ${tts.error.name || "Error"}`;
+      if (!tts.ok) return `FAIL / ${tts.status} / ${tts.elapsed}ms / HTTP error`;
+      if (ttsBusinessOk) return `PASS / ${tts.status} / ${tts.elapsed}ms / audio_url returned`;
+      const err = tts.data && tts.data.error ? tts.data.error : "missing success/audio_url";
+      return `FAIL / ${tts.status} / ${tts.elapsed}ms / ${err}`;
+    }
+
+    function renderRows(rows) {
+      resultBody.innerHTML = rows.map((r) => {
+        const markClass = r.overallOk ? "ok" : "fail";
+        const markText = r.overallOk ? "PASS" : "FAIL";
+        return `
+          <tr>
+            <td><code>${esc(r.baseUrl)}</code></td>
+            <td>${esc(healthText(r.health))}</td>
+            <td>${esc(ttsText(r.tts, r.ttsBusinessOk))}</td>
+            <td class="${markClass}">${markText}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    async function run() {
+      runBtn.disabled = true;
+      runningState.textContent = "檢查中...";
+      summary.textContent = "";
+      resultBody.innerHTML = "";
+
+      const timeoutSec = Number(timeoutSecInput.value) || 8;
+      const timeoutMs = Math.max(1000, timeoutSec * 1000);
+
+      const tasks = BASE_URLS.map((url) => checkOne(url, timeoutMs));
+      const rows = await Promise.all(tasks);
+      renderRows(rows);
+
+      const pass = rows.filter(r => r.overallOk).length;
+      summary.textContent = `總計：${pass}/${rows.length} 個端點可用（health + tts 都成功）`;
+      runningState.textContent = "完成";
+      runBtn.disabled = false;
+    }
+
+    runBtn.addEventListener("click", run);
+    window.addEventListener("DOMContentLoaded", run);
+  </script>
+</body>
+</html>
